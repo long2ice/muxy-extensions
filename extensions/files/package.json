@@ -1,0 +1,76 @@
+{
+  "name": "files",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pierre/trees": "^1.0.0-beta.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "File explorer for Muxy",
+    "permissions": [
+      "files:read",
+      "files:write",
+      "panels:write",
+      "tabs:write",
+      "commands:exec"
+    ],
+    "events": [
+      "file.changed",
+      "worktree.switched",
+      "project.switched"
+    ],
+    "panels": [
+      {
+        "id": "files",
+        "title": "Files",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned",
+        "hiddenControls": ["pin", "position"],
+        "icon": { "symbol": "folder" }
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "editor",
+        "title": "Editor",
+        "entry": "panel/editor.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-files",
+        "title": "Toggle Files",
+        "defaultShortcut": "cmd+shift+e",
+        "action": { "kind": "togglePanel", "panel": "files" }
+      },
+      { "id": "files-refresh", "title": "Refresh Files" },
+      { "id": "files-new-file", "title": "New File" },
+      { "id": "files-new-folder", "title": "New Folder" }
+    ],
+    "topbarItems": [
+      {
+        "id": "files",
+        "icon": { "symbol": "folder" },
+        "tooltip": "Toggle Files",
+        "command": "toggle-files"
+      }
+    ]
+  }
+}

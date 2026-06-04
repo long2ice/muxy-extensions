@@ -1,44 +1,50 @@
-async function git(args: string[]): Promise<string | null> {
+let last_branch: string | null = null;
+
+async function sync_items(fresh = false): Promise<void> {
+  let currentBranch: string | null = null;
   try {
-    const res = await muxy.exec(["git", ...args]);
-    if (res.exitCode !== 0) return null;
-    return res.stdout.trim();
+    currentBranch = (await muxy.git.repoInfo({ fresh })).currentBranch;
   } catch {
-    return null;
+    currentBranch = null;
   }
-}
 
-async function current_branch(): Promise<string | null> {
-  const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
-  return branch && branch !== "HEAD" ? branch : null;
-}
+  last_branch = currentBranch;
 
-async function pr_number(): Promise<string | null> {
-  try {
-    const res = await muxy.exec(["gh", "pr", "view", "--json", "number", "-q", ".number"]);
-    if (res.exitCode !== 0) return null;
-    return res.stdout.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-async function sync_items(): Promise<void> {
-  const branch = await current_branch();
-  if (!branch) {
+  if (!currentBranch) {
     muxy.statusbar.hide("branch");
     muxy.statusbar.hide("pr-info");
     return;
   }
 
-  muxy.statusbar.set({ id: "branch", text: branch, visible: true });
+  muxy.statusbar.set({ id: "branch", text: currentBranch, visible: true });
 
-  const pr = await pr_number();
+  let pr: number | null = null;
+  try {
+    pr = await muxy.git.pr.number({ fresh });
+  } catch {
+    pr = null;
+  }
   if (pr) muxy.statusbar.set({ id: "pr-info", text: `#${pr}`, visible: true });
   else muxy.statusbar.hide("pr-info");
 }
 
+function is_ref_change(payload: unknown): boolean {
+  const path = (payload as { path?: string } | null)?.path ?? "";
+  return /\/\.git\/(HEAD|packed-refs|refs\/)/.test(path);
+}
+
+async function on_ref_change(payload: unknown): Promise<void> {
+  if (!is_ref_change(payload)) return;
+  let branch: string | null = null;
+  try {
+    branch = (await muxy.git.repoInfo({ fresh: true })).currentBranch;
+  } catch {
+    return;
+  }
+  if (branch !== last_branch) void sync_items(true);
+}
+
 void sync_items();
-muxy.events.subscribe("project.switched", () => void sync_items());
-muxy.events.subscribe("worktree.switched", () => void sync_items());
-muxy.events.subscribe("file.changed", () => void sync_items());
+muxy.events.subscribe("project.switched", () => void sync_items(true));
+muxy.events.subscribe("worktree.switched", () => void sync_items(true));
+muxy.events.subscribe("file.changed", (payload) => void on_ref_change(payload));

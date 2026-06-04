@@ -13,37 +13,47 @@ export function use_git_panel() {
   const refresh_id = useRef(0);
   const cache = useRef(new Map<string, RepoState>());
 
-  const refresh = useCallback(async () => {
-    const id = ++refresh_id.current;
-    const current = () => refresh_id.current === id;
-    const key = await active_worktree_path();
-    let next: RepoState;
-    try {
-      next = { kind: "ready", status: to_view_status(await muxy.git.status()) };
-    } catch {
-      next = { kind: "no_repo" };
-    }
-    if (key) cache.current.set(key, next);
-    if (current()) {
-      set_state(next);
-      set_switching(false);
-    }
+  const cache_when_resolved = useCallback((key: Promise<string | undefined>, value: RepoState) => {
+    void key.then((k) => {
+      if (k) cache.current.set(k, value);
+    });
   }, []);
+
+  const refresh = useCallback(
+    async (force = true) => {
+      const id = ++refresh_id.current;
+      const current = () => refresh_id.current === id;
+      const key = active_worktree_path();
+      let next: RepoState;
+      try {
+        next = { kind: "ready", status: to_view_status(await muxy.git.status({ fresh: force })) };
+      } catch {
+        next = { kind: "no_repo" };
+      }
+      cache_when_resolved(key, next);
+      if (current()) {
+        set_state(next);
+        set_switching(false);
+      }
+    },
+    [cache_when_resolved],
+  );
 
   const switch_scope = useCallback(async () => {
     const id = ++refresh_id.current;
     const current = () => refresh_id.current === id;
-    const key = await active_worktree_path();
-    if (!current()) return;
+    const key = active_worktree_path();
 
-    const cached = key ? cache.current.get(key) : undefined;
-    if (cached) {
-      set_state(cached);
-      set_switching(false);
-    } else {
-      set_state({ kind: "loading" });
-      set_switching(true);
-    }
+    set_state({ kind: "loading" });
+    set_switching(true);
+
+    void key.then((k) => {
+      const cached = k ? cache.current.get(k) : undefined;
+      if (cached && current()) {
+        set_state(cached);
+        set_switching(false);
+      }
+    });
 
     let next: RepoState;
     try {
@@ -51,21 +61,43 @@ export function use_git_panel() {
     } catch {
       next = { kind: "no_repo" };
     }
-    if (key) cache.current.set(key, next);
+    cache_when_resolved(key, next);
     if (current()) {
       set_state(next);
       set_switching(false);
     }
-  }, []);
+  }, [cache_when_resolved]);
 
   const reconcile_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconcile = useCallback(() => {
     if (reconcile_timer.current) clearTimeout(reconcile_timer.current);
-    reconcile_timer.current = setTimeout(() => {
+    reconcile_timer.current = setTimeout(async () => {
       reconcile_timer.current = null;
-      void refresh();
+      const id = ++refresh_id.current;
+      const key = active_worktree_path();
+      let next: RepoState;
+      try {
+        const [cwd, status] = await Promise.all([
+          key,
+          muxy.git.status({ local: true }).then(to_view_status),
+        ]);
+        const prev = cwd ? cache.current.get(cwd) : undefined;
+        if (prev?.kind === "ready" && prev.status.branch === status.branch) {
+          status.pullRequest = prev.status.pullRequest;
+          status.defaultBranch = prev.status.defaultBranch;
+        } else if (prev?.kind === "ready") {
+          void refresh();
+          return;
+        }
+        next = { kind: "ready", status };
+      } catch {
+        next = { kind: "no_repo" };
+      }
+      if (refresh_id.current !== id) return;
+      cache_when_resolved(key, next);
+      set_state(next);
     }, 250);
-  }, [refresh]);
+  }, [refresh, cache_when_resolved]);
 
   const move_entry = useCallback(
     (path: string, from: "staged" | "unstaged", to: "staged" | "unstaged") => {
@@ -174,8 +206,24 @@ export function use_git_panel() {
     [refresh],
   );
 
+  const initial_load = useCallback(async () => {
+    const id = ++refresh_id.current;
+    const key = active_worktree_path();
+    try {
+      const status = to_view_status(await muxy.git.status({ local: true }));
+      if (refresh_id.current === id) {
+        const next: RepoState = { kind: "ready", status };
+        cache_when_resolved(key, next);
+        set_state(next);
+      }
+    } catch {
+      /* fall through to full refresh */
+    }
+    void refresh(false);
+  }, [refresh, cache_when_resolved]);
+
   useEffect(() => {
-    void refresh();
+    void initial_load();
     const off_project = muxy.events.subscribe("project.switched", () => void switch_scope());
     const off_worktree = muxy.events.subscribe("worktree.switched", () => void switch_scope());
     const off_file = muxy.events.subscribe("file.changed", () => reconcile());
@@ -185,7 +233,7 @@ export function use_git_panel() {
       off_file?.();
       if (reconcile_timer.current) clearTimeout(reconcile_timer.current);
     };
-  }, [refresh, switch_scope, reconcile]);
+  }, [initial_load, switch_scope, reconcile]);
 
   return {
     state,

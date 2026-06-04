@@ -34,6 +34,7 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
+        "hiddenControls": ["pin", "position"],
         "headerButtons": [
           {
             "id": "refresh",

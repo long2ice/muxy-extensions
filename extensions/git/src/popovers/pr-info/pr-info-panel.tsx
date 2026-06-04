@@ -22,7 +22,7 @@ export function PrInfoPanel() {
 
     set_refreshing(true);
     try {
-      const s = await fetch_resolved_status();
+      const s = await fetch_resolved_status(true);
       if (s.pullRequest) {
         const info = {
           pr: s.pullRequest,

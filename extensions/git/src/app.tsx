@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { exec_git, active_worktree_path } from "@/lib/git";
+import { try_action } from "@/lib/git";
 import { use_git_panel } from "@/hooks/use-git-panel";
 import { use_create_pr } from "@/hooks/use-create-pr";
 import { NoRepo } from "@/components/no-repo";
@@ -34,7 +34,7 @@ export function App() {
   }, [refresh]);
 
   async function init() {
-    if (await exec_git(await active_worktree_path(), ["init"], "Could not initialize repository")) {
+    if (await try_action(() => muxy.git.init(), "Could not initialize repository")) {
       void refresh();
     }
   }

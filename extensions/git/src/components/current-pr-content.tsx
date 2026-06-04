@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { ExternalLink, GitMerge, Loader2, Trash2, XCircle } from "lucide-react";
-import { open_url } from "@/lib/git";
+import { confirm_action, open_url } from "@/lib/git";
 import { pr_state, type MergeMethod } from "@/lib/git-prs";
 import { PrStateIcon } from "./pr-state-icon";
-import { InlineConfirm } from "./inline-confirm";
 
 export type PrAction = MergeMethod | "close" | "cleanup";
 
@@ -32,18 +30,33 @@ export function CurrentPrContent({
   onCleanup,
   onDone,
 }: CurrentPrContentProps) {
-  const [confirming, set_confirming] = useState<"close" | "cleanup" | null>(null);
   const busy = pending !== null;
 
   async function run(action: Promise<boolean>) {
-    set_confirming(null);
     const ok = await action;
     if (ok) onDone?.();
   }
 
-  const cleanupMessage = `This switches to ${defaultBranch ?? "the default branch"} and deletes branch "${
-    branch ?? ""
-  }".${dirty ? " Uncommitted changes will no longer belong to any branch." : ""}`;
+  async function confirm_close() {
+    const ok = await confirm_action({
+      title: `Close PR #${pr.number}?`,
+      message: `This closes pull request #${pr.number} without merging it.`,
+      confirmLabel: "Close PR",
+    });
+    if (ok) void run(onClose(pr.number));
+  }
+
+  async function confirm_cleanup() {
+    const ok = await confirm_action({
+      title: `Clean up branch "${branch}"?`,
+      message: `This switches to ${defaultBranch ?? "the default branch"} and deletes branch "${
+        branch ?? ""
+      }".${dirty ? " Uncommitted changes will no longer belong to any branch." : ""}`,
+      confirmLabel: "Clean Up",
+      critical: dirty,
+    });
+    if (ok) void run(onCleanup());
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -61,14 +74,14 @@ export function CurrentPrContent({
             disabled={busy || pr_state(pr) !== "open"}
             loading={pending === "close"}
             tone="danger"
-            onClick={() => set_confirming("close")}
+            onClick={() => void confirm_close()}
           />
           <IconAction
             icon={Trash2}
             title="Clean up branch"
             disabled={busy || !branch}
             loading={pending === "cleanup"}
-            onClick={() => set_confirming("cleanup")}
+            onClick={() => void confirm_cleanup()}
           />
           <IconAction icon={ExternalLink} title="View on GitHub" onClick={() => open_url(pr.url)} />
         </div>
@@ -77,27 +90,7 @@ export function CurrentPrContent({
       <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
       <ChecksRow checks={pr.checks} />
 
-      {confirming === "close" ? (
-        <InlineConfirm
-          message={`Close pull request #${pr.number} without merging it.`}
-          confirmLabel="Close PR"
-          tone="danger"
-          loading={pending === "close"}
-          onConfirm={() => void run(onClose(pr.number))}
-          onCancel={() => set_confirming(null)}
-        />
-      ) : confirming === "cleanup" ? (
-        <InlineConfirm
-          message={cleanupMessage}
-          confirmLabel="Clean Up"
-          tone="danger"
-          loading={pending === "cleanup"}
-          onConfirm={() => void run(onCleanup())}
-          onCancel={() => set_confirming(null)}
-        />
-      ) : (
-        <Actions pr={pr} pending={pending} onMerge={(method) => void run(onMerge(method, true))} />
-      )}
+      <Actions pr={pr} pending={pending} onMerge={(method) => void run(onMerge(method, true))} />
     </div>
   );
 }

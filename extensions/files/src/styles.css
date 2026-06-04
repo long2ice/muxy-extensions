@@ -1,0 +1,221 @@
+:root {
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 10px;
+  --s6: 12px;
+  --s7: 16px;
+  --font-footnote: 11px;
+  --font-body: 12px;
+  --font-title: 14px;
+  --radius: 6px;
+}
+
+html,
+body {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+}
+
+.panel {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s6);
+}
+
+.title {
+  font-size: var(--font-title);
+  font-weight: 600;
+}
+
+.caption {
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--s4);
+  background: var(--muxy-surface);
+}
+
+.count {
+  font: 600 var(--font-title) "SF Mono", Menlo, monospace;
+  color: var(--muxy-accent);
+}
+
+.button {
+  height: 28px;
+  padding: 0 var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-body);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--muxy-hover);
+}
+
+/* --- files panel --- */
+.files-panel {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+}
+
+/* Full-height wrapper: the tree fills the panel so the empty area below the
+   last row still belongs to the webview's tree surface (right-click there opens
+   our root menu, not the native webview menu). */
+.file-tree-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.file-tree {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Make the @pierre/trees host (:host{height:100%}) actually fill the wrapper. */
+.file-tree-wrap > .file-tree {
+  height: 100%;
+}
+
+.files-status {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s7);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-body);
+  text-align: center;
+}
+
+/* --- context menu (rendered into the trees shadow slot) --- */
+.ctx-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: var(--s2);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  /* Opaque base (page background) so the menu never shows what's behind it,
+     then the surface tint on top. --muxy-surface can be translucent. */
+  background-color: var(--muxy-background);
+  background-image: linear-gradient(var(--muxy-surface), var(--muxy-surface));
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+/* Root menu (empty-area right-click) is positioned at the cursor. */
+.ctx-menu-floating {
+  position: fixed;
+  z-index: 1000;
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--s4);
+  border: none;
+  border-radius: var(--s3);
+  background: transparent;
+  color: var(--muxy-foreground);
+  font-size: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ctx-item:hover {
+  background: var(--muxy-hover);
+}
+
+.ctx-item-critical {
+  color: var(--muxy-diff-remove, var(--muxy-foreground));
+}
+
+/* --- editor --- */
+.editor {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s4) var(--s6);
+  border-bottom: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+}
+
+.editor-filename {
+  font-size: var(--font-title);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--s3);
+}
+
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editor-content {
+  margin: 0;
+  padding: var(--s6);
+  font: var(--font-body) "SF Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-status {
+  padding: var(--s6);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-body);
+}
+
+.editor-error {
+  color: var(--muxy-foreground);
+}
+
+.editor-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-body);
+}

@@ -1,4 +1,8 @@
-import { exec_git, git_output, active_worktree_path, alert_error } from "@/lib/git";
+import { active_worktree_path, alert_error } from "@/lib/git";
+
+async function pull_quietly(project: string | undefined): Promise<void> {
+  await muxy.git.pull({ project }).catch(() => undefined);
+}
 
 interface CleanupTarget {
   branch: string | null;
@@ -16,14 +20,18 @@ export async function active_project_path(): Promise<string | undefined> {
 
 export async function active_worktree(project?: string): Promise<MuxyWorktree | undefined> {
   const worktrees = await muxy.worktrees.list(project).catch(() => [] as MuxyWorktree[]);
-  return worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
+  const info = await muxy.git.repoInfo({ project }).catch(() => null);
+  const toplevel = info?.root;
+  return (
+    (toplevel ? worktrees.find((w) => w.path === toplevel) : undefined) ??
+    worktrees.find((w) => w.isActive) ??
+    worktrees.find((w) => w.isPrimary)
+  );
 }
 
 export async function is_on_worktree(project?: string): Promise<boolean> {
-  const cwd = (await active_worktree(project))?.path ?? (await active_worktree_path());
-  const gitDir = await git_output(cwd, ["rev-parse", "--git-dir"]);
-  const commonDir = await git_output(cwd, ["rev-parse", "--git-common-dir"]);
-  if (gitDir !== null && commonDir !== null) return gitDir !== commonDir;
+  const info = await muxy.git.repoInfo({ project }).catch(() => null);
+  if (info) return info.isWorktree;
 
   const active = await active_worktree(project);
   return !!active && !active.isPrimary;
@@ -35,7 +43,7 @@ export async function remove_active_worktree(
   project: string | undefined,
 ): Promise<void> {
   const worktrees = await muxy.worktrees.list(project).catch(() => [] as MuxyWorktree[]);
-  const active = worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
+  const active = await active_worktree(project);
   if (!active || active.isPrimary) {
     throw new Error("No active worktree to remove.");
   }
@@ -50,6 +58,7 @@ export async function remove_active_worktree(
   }
   await muxy.git.worktree.remove({ project, path: active.path, force });
   if (branch) await muxy.git.branch.deleteRemote({ project, branch }).catch(() => undefined);
+  if (replacement) await pull_quietly(project);
   await muxy.worktrees.refresh(project);
 }
 
@@ -72,22 +81,19 @@ export async function remove_worktree_or_branch({
     throw new Error(`"${branch}" is the default branch and won't be deleted.`);
   }
 
-  const active = await active_worktree(project);
-  const cwd = active?.path ?? (await active_worktree_path());
   const target = defaultBranch ?? "main";
 
-  const switched = await exec_git(cwd, ["switch", target], `Could not switch to ${target}`);
-  if (!switched) return;
+  await muxy.git.branch.switchTo({ project, branch: target });
 
-  const current = await git_output(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  if (current === branch) {
+  const { currentBranch } = await muxy.git.repoInfo({ project });
+  if (currentBranch === branch) {
     throw new Error(`Still on "${branch}" after switching to ${target}.`);
   }
 
-  const deleted = await exec_git(cwd, ["branch", "-D", branch], "Could not delete branch");
-  if (!deleted) return;
+  await muxy.git.branch.delete({ project, name: branch, force: true });
 
   await muxy.git.branch.deleteRemote({ project, branch }).catch(() => undefined);
+  await pull_quietly(project);
   await muxy.worktrees.refresh(project);
 }
 

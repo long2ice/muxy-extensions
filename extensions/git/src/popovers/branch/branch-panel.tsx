@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, GitBranch, Plus, Trash2, X } from "lucide-react";
+import { Check, GitBranch, Plus, Trash2 } from "lucide-react";
 import { list_branches } from "@/lib/git-branches";
-import { try_action, exec_git, active_worktree_path } from "@/lib/git";
+import { try_action, confirm_action } from "@/lib/git";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -42,9 +42,15 @@ export function BranchPanel() {
   }
 
   async function remove(name: string) {
-    const ok = await exec_git(
-      await active_worktree_path(),
-      ["branch", "-D", name],
+    const confirmed = await confirm_action({
+      title: `Delete branch "${name}"?`,
+      message: `This permanently deletes the local branch "${name}".`,
+      confirmLabel: "Delete",
+      critical: true,
+    });
+    if (!confirmed) return;
+    const ok = await try_action(
+      () => muxy.git.branch.delete({ name, force: true }),
       "Could not delete branch",
     );
     if (ok) void reload();
@@ -102,40 +108,6 @@ interface BranchRowProps {
 }
 
 function BranchRow({ name, active, onSelect, onDelete }: BranchRowProps) {
-  const [confirming, set_confirming] = useState(false);
-
-  if (confirming) {
-    return (
-      <CommandItem value={name} onSelect={() => {}} className="justify-between gap-2">
-        <span className="min-w-0 truncate text-diff-remove">Delete “{name}”?</span>
-        <span className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            title="Confirm delete"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="flex size-5 items-center justify-center rounded text-diff-remove hover:bg-diff-remove/15"
-          >
-            <Check size={13} />
-          </button>
-          <button
-            type="button"
-            title="Cancel"
-            onClick={(e) => {
-              e.stopPropagation();
-              set_confirming(false);
-            }}
-            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <X size={13} />
-          </button>
-        </span>
-      </CommandItem>
-    );
-  }
-
   return (
     <CommandItem
       value={name}
@@ -156,7 +128,7 @@ function BranchRow({ name, active, onSelect, onDelete }: BranchRowProps) {
           title="Delete branch"
           onClick={(e) => {
             e.stopPropagation();
-            set_confirming(true);
+            onDelete();
           }}
           className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-diff-remove/15 hover:text-diff-remove group-hover:opacity-100"
         >

@@ -438,43 +438,32 @@ function diffData() {
 }
 
 async function loadGitDiff() {
-  if (!window.muxy?.exec) {
-    clearDiff("Muxy exec unavailable");
+  if (!window.muxy?.git) {
+    clearDiff("Muxy git unavailable");
     return;
   }
 
   const data = diffData();
+  const project = data.cwd;
   summaryNode.textContent = "Loading diff…";
 
   try {
     if (data.source === "pr" && data.prNumber) {
       sourceLabelNode.textContent = `PR #${data.prNumber}`;
       showLoading(`Loading diff for PR #${data.prNumber}…`);
-      const result = await window.muxy.exec(
-        ["gh", "pr", "diff", String(data.prNumber), "--color", "never"],
-        { timeoutMs: 30000, cwd: data.cwd },
-      );
-      if (result.exitCode !== 0 || !result.stdout.trim()) {
-        const reason = (result.stderr || "").trim().split("\n")[0];
-        clearDiff(reason || `gh pr diff exited with ${result.exitCode}`);
+      const { diff } = await window.muxy.git.pr.diff({ project, number: data.prNumber });
+      if (!diff.trim()) {
+        clearDiff("This pull request has no diff.");
         return;
       }
-      await renderPatch(result.stdout, data.focusPath ?? "");
+      await renderPatch(diff, data.focusPath ?? "");
       return;
     }
 
     sourceLabelNode.textContent = "Working Tree";
     showLoading("Loading changes…");
-    const base = ["git", "diff", "--no-ext-diff", "--no-color"];
-    let result = await window.muxy.exec([...base, "HEAD"], { timeoutMs: 15000, cwd: data.cwd });
-    if (result.exitCode !== 0) {
-      result = await window.muxy.exec(base, { timeoutMs: 15000, cwd: data.cwd });
-    }
-    if (result.exitCode !== 0) {
-      throw new Error(result.stderr || `git diff exited with ${result.exitCode}`);
-    }
-
-    await renderPatch(result.stdout, data.focusPath ?? "");
+    const { diff } = await window.muxy.git.diff({ project, raw: true });
+    await renderPatch(diff, data.focusPath ?? "");
   } catch (error) {
     clearDiff(error instanceof Error ? error.message : String(error));
   }

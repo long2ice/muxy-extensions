@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { alert_error, exec_git, active_worktree_path } from "@/lib/git";
+import { alert_error } from "@/lib/git";
 import { commit_all, has_pending_changes } from "@/lib/git-commit";
 import { create_pr } from "@/lib/git-prs";
 
@@ -15,19 +15,16 @@ export function use_create_pr(refreshGit: () => Promise<void>) {
   return useCallback(
     async (input: CreatePrInput) => {
       try {
-        const cwd = await active_worktree_path();
-
         if (input.newBranch) {
           await muxy.git.branch.create({ name: input.newBranch });
         }
 
-        if (await has_pending_changes(cwd)) {
-          const committed = await commit_all(cwd, input.title);
+        if (await has_pending_changes()) {
+          const committed = await commit_all(input.title);
           if (!committed) return false;
         }
 
-        const pushed = await exec_git(cwd, ["push", "-u", "origin", "HEAD"], "Could not push branch");
-        if (!pushed) return false;
+        await muxy.git.push({ setUpstream: true });
 
         await create_pr(input.title, input.body, input.baseBranch, input.draft ?? false);
         await refreshGit();

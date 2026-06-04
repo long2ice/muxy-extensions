@@ -18,11 +18,11 @@ export function PullRequestsPanel() {
   const [refreshing, set_refreshing] = useState(false);
 
   const load = useCallback(
-    async (showSpinner: boolean) => {
+    async (showSpinner: boolean, fresh = false) => {
       if (showSpinner) set_state({ kind: "loading" });
       set_refreshing(true);
       try {
-        const prs = await muxy.git.pr.list({ filter, limit: 50 });
+        const prs = await muxy.git.pr.list({ filter, limit: 50, fresh });
         set_state({ kind: "ready", prs });
       } catch (err) {
         set_state({ kind: "error", message: error_text(err) });
@@ -91,7 +91,7 @@ export function PullRequestsPanel() {
       if (!ok) return;
       try {
         await close_pr(number);
-        await load(false);
+        await load(false, true);
       } catch (err) {
         await alert_error(`Could not close PR #${number}`, err);
       }
@@ -107,7 +107,7 @@ export function PullRequestsPanel() {
         <button
           type="button"
           title="Refresh"
-          onClick={() => void load(false)}
+          onClick={() => void load(false, true)}
           disabled={refreshing}
           className="ml-auto flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
         >
