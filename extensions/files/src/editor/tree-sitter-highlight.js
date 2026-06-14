@@ -1,6 +1,6 @@
 import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin } from "@codemirror/view";
-import { ensure_syntax_palette, syn } from "@/lib/syntax-theme";
+import { syn } from "@/lib/syntax-theme";
 
 // Incremental parsing keeps edits cheap, but the first parse of a very large
 // document would block the UI, so tree-sitter bows out above this size.
@@ -181,7 +181,6 @@ class TreeSitterHighlighter {
 }
 
 export function tree_sitter_highlight(grammar) {
-  ensure_syntax_palette();
   return [
     tree_sitter_theme,
     ViewPlugin.define((view) => new TreeSitterHighlighter(view, grammar), {

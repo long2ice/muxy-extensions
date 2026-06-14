@@ -5,57 +5,29 @@ const FG = "var(--muxy-foreground)";
 const MUTED = "var(--muxy-foreground-muted)";
 const ACCENT = "var(--muxy-accent)";
 
-// Token palettes per color scheme. The muxy theme variables only expose a
-// single accent hue, which is not enough to tell keywords, strings, types and
-// functions apart, so syntax tokens get their own palette. It is installed as
-// CSS variables and re-applied on theme switches so every consumer (the
-// CodeMirror editor, the tree-sitter highlighter, the markdown preview)
-// tracks the live color scheme.
-const PALETTES = {
-  light: {
-    keyword: "#cf222e",
-    string: "#0a3069",
-    regexp: "#116329",
-    escape: "#0550ae",
-    constant: "#0550ae",
-    function: "#8250df",
-    type: "#953800",
-    property: "#0550ae",
-    tag: "#116329",
-  },
-  dark: {
-    keyword: "#ff7b72",
-    string: "#a5d6ff",
-    regexp: "#7ee787",
-    escape: "#79c0ff",
-    constant: "#79c0ff",
-    function: "#d2a8ff",
-    type: "#ffa657",
-    property: "#79c0ff",
-    tag: "#7ee787",
-  },
+// The muxy theme exposes a single accent hue, which is not enough on its own to
+// tell keywords, strings, types and functions apart. Rather than ship a private
+// hardcoded palette, every syntax token is derived from the theme's own tokens
+// — the accent and the diff add/remove/hunk semantic colors — via color-mix, so
+// the highlighting tracks the user's accent and inverts with the live light/
+// dark theme automatically (no runtime re-injection on theme switch needed).
+//
+// color-mix toward --muxy-foreground keeps each hue legible against the
+// background in both schemes; the mix ratios fan the few source hues out into
+// distinguishable token colors.
+const PALETTE = {
+  keyword: "color-mix(in oklab, var(--muxy-diff-remove) 78%, var(--muxy-foreground))",
+  string: "color-mix(in oklab, var(--muxy-accent) 82%, var(--muxy-foreground))",
+  regexp: "color-mix(in oklab, var(--muxy-diff-add) 80%, var(--muxy-foreground))",
+  escape: "color-mix(in oklab, var(--muxy-accent) 62%, var(--muxy-foreground))",
+  constant: "color-mix(in oklab, var(--muxy-accent) 62%, var(--muxy-foreground))",
+  function: "color-mix(in oklab, var(--muxy-diff-hunk) 78%, var(--muxy-foreground))",
+  type: "color-mix(in oklab, var(--muxy-diff-remove) 50%, var(--muxy-diff-hunk))",
+  property: "color-mix(in oklab, var(--muxy-accent) 70%, var(--muxy-foreground))",
+  tag: "color-mix(in oklab, var(--muxy-diff-add) 80%, var(--muxy-foreground))",
 };
 
-export const syn = (name) => `var(--muxy-files-syn-${name})`;
-
-let palette_installed = false;
-
-export function ensure_syntax_palette() {
-  if (palette_installed || typeof document === "undefined") return;
-  palette_installed = true;
-  const apply = (scheme) => {
-    const palette = PALETTES[scheme === "dark" ? "dark" : "light"];
-    for (const [name, color] of Object.entries(palette)) {
-      document.documentElement.style.setProperty(`--muxy-files-syn-${name}`, color);
-    }
-  };
-  if (typeof muxy !== "undefined" && muxy?.theme) {
-    apply(muxy.theme.colorScheme);
-    muxy.onThemeChange?.((theme) => apply(theme.colorScheme));
-  } else {
-    apply(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  }
-}
+export const syn = (name) => PALETTE[name] ?? FG;
 
 export const SYNTAX_SPEC = [
   { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword, t.definitionKeyword], color: syn("keyword") },
@@ -80,7 +52,6 @@ export const SYNTAX_SPEC = [
 ];
 
 export function muxy_highlight_style() {
-  ensure_syntax_palette();
   return syntaxHighlighting(HighlightStyle.define(SYNTAX_SPEC));
 }
 
@@ -88,7 +59,6 @@ const PREVIEW_STYLE_ID = "muxy-files-syntax";
 
 export function ensure_preview_highlight_css() {
   if (typeof document === "undefined") return;
-  ensure_syntax_palette();
   if (document.getElementById(PREVIEW_STYLE_ID)) return;
   const css = SYNTAX_SPEC.map((rule, i) => {
     const decls = [];
