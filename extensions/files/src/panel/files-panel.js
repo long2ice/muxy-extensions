@@ -18,7 +18,7 @@ import {
   rename_fs,
 } from "@/lib/file-ops";
 import { cls, h, icon_svg } from "@/lib/dom";
-import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
+import { material_file_icon, material_folder_icon } from "@/lib/material-icon";
 import { GitStatusStore } from "@/lib/git-status";
 
 const RECONCILE_DEBOUNCE_MS = 250;
@@ -82,8 +82,8 @@ function chevron_icon(expanded) {
 }
 
 function file_icon(kind, path) {
-  if (kind === "directory") return icon_svg(FOLDER_PATHS);
-  return icon_svg(icon_paths_for(path));
+  if (kind === "directory") return material_folder_icon();
+  return material_file_icon(path);
 }
 
 function path_after_rename(sourcePath, newName, isFolder) {

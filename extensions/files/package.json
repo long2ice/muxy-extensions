@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js')\"",
+    "gen-icons": "node scripts/gen-material-icons.mjs",
     "update-skill": "node scripts/update-skill.mjs"
   },
   "private": true,
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "material-icon-theme": "^5.35.0",
     "tailwindcss": "^4.3.0",
     "vite": "^7.3.5"
   },
