@@ -18,6 +18,7 @@ import {
   rename_fs,
 } from "@/lib/file-ops";
 import { cls, h, icon_svg } from "@/lib/dom";
+import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
 import { GitStatusStore } from "@/lib/git-status";
 
 const RECONCILE_DEBOUNCE_MS = 250;
@@ -80,14 +81,9 @@ function chevron_icon(expanded) {
   return icon_svg([{ d: expanded ? "M6 9l6 6 6-6" : "M9 6l6 6-6 6" }]);
 }
 
-function file_icon(kind) {
-  if (kind === "directory") {
-    return icon_svg([{ d: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }]);
-  }
-  return icon_svg([
-    { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" },
-    { d: "M14 2v6h6" },
-  ]);
+function file_icon(kind, path) {
+  if (kind === "directory") return icon_svg(FOLDER_PATHS);
+  return icon_svg(icon_paths_for(path));
 }
 
 function path_after_rename(sourcePath, newName, isFolder) {
@@ -443,7 +439,7 @@ export class FilesPanelApp {
             chevron_icon(expanded),
           )
         : h("span", { class: "file-tree-disclosure file-tree-disclosure-placeholder" }),
-      h("span", { class: "file-tree-kind-icon" }, file_icon(entry.kind)),
+      h("span", { class: "file-tree-kind-icon" }, file_icon(entry.kind, path)),
       renaming ? this.renderRenameInput(path, directory) : h("span", { class: "file-tree-name", title: path }, basename(path)),
       !renaming && !directory && gitStatus
         ? h("span", { class: "file-tree-git-mark", title: GIT_STATUS_LABEL[gitStatus] }, GIT_STATUS_GLYPH[gitStatus])
