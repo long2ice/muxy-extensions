@@ -19,6 +19,8 @@ import {
 } from "@/lib/file-ops";
 import { cls, h, icon_svg } from "@/lib/dom";
 import { material_file_icon, material_folder_icon } from "@/lib/material-icon";
+import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
+import { load_icon_theme, save_icon_theme, subscribe_icon_theme } from "@/lib/icon-theme";
 import { GitStatusStore } from "@/lib/git-status";
 
 const RECONCILE_DEBOUNCE_MS = 250;
@@ -81,9 +83,11 @@ function chevron_icon(expanded) {
   return icon_svg([{ d: expanded ? "M6 9l6 6 6-6" : "M9 6l6 6-6 6" }]);
 }
 
-function file_icon(kind, path) {
-  if (kind === "directory") return material_folder_icon();
-  return material_file_icon(path);
+function file_icon(kind, path, theme) {
+  if (theme === "material") {
+    return kind === "directory" ? material_folder_icon() : material_file_icon(path);
+  }
+  return icon_svg(kind === "directory" ? FOLDER_PATHS : icon_paths_for(path));
 }
 
 function path_after_rename(sourcePath, newName, isFolder) {
@@ -150,6 +154,7 @@ export class FilesPanelApp {
     this.disposers = [];
     this.gitStatus = new GitStatusStore();
     this.dirtyFilter = false;
+    this.iconTheme = load_icon_theme();
 
     this.ops = {
       createFile: (parentRel = "") => this.createFile(parentRel),
@@ -198,6 +203,12 @@ export class FilesPanelApp {
       muxy.events.subscribe("command.files-new-folder", () => void this.createFolder("")),
       muxy.events.subscribe("command.files-refresh", () => void this.loadRoot()),
       muxy.events.subscribe("command.files-toggle-dirty-filter", () => this.toggleDirtyFilter()),
+      muxy.events.subscribe("command.files-toggle-icon-theme", () => this.toggleIconTheme()),
+      subscribe_icon_theme((theme) => {
+        if (theme === this.iconTheme) return;
+        this.iconTheme = theme;
+        this.render();
+      }),
       () => this.gitStatus.dispose(),
       () => document.removeEventListener("contextmenu", this.preventNativeContextMenu),
     );
@@ -304,6 +315,10 @@ export class FilesPanelApp {
       await this.ensureDirtyLoaded();
     }
     this.render();
+  }
+
+  toggleIconTheme() {
+    save_icon_theme(this.iconTheme === "material" ? "stroke" : "material");
   }
 
   onGitStatusChange() {
@@ -439,7 +454,7 @@ export class FilesPanelApp {
             chevron_icon(expanded),
           )
         : h("span", { class: "file-tree-disclosure file-tree-disclosure-placeholder" }),
-      h("span", { class: "file-tree-kind-icon" }, file_icon(entry.kind, path)),
+      h("span", { class: "file-tree-kind-icon" }, file_icon(entry.kind, path, this.iconTheme)),
       renaming ? this.renderRenameInput(path, directory) : h("span", { class: "file-tree-name", title: path }, basename(path)),
       !renaming && !directory && gitStatus
         ? h("span", { class: "file-tree-git-mark", title: GIT_STATUS_LABEL[gitStatus] }, GIT_STATUS_GLYPH[gitStatus])
