@@ -229,17 +229,17 @@ textarea {
 
 .file-tree-kind-icon {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
   align-items: center;
   justify-content: center;
   color: var(--muxy-foreground-muted);
 }
 
 .file-tree-kind-icon img {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   object-fit: contain;
 }
 

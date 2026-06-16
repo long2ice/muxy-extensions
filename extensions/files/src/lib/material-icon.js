@@ -7,7 +7,7 @@ import { BY_EXTENSION, BY_FILENAME, DEFAULT_FILE, DEFAULT_FOLDER, ICON_SVG } fro
 // ids isolated (several icons reuse id="a") and its brand colors intact instead
 // of being overridden by the tree's currentColor.
 
-const ICON_PX = 16;
+const ICON_PX = 14;
 const data_uri_cache = new Map();
 
 function data_uri(iconName) {
