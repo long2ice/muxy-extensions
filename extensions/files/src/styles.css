@@ -237,6 +237,12 @@ textarea {
   color: var(--muxy-foreground-muted);
 }
 
+.file-tree-kind-icon img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
 .file-tree-name {
   min-width: 0;
   overflow: hidden;
