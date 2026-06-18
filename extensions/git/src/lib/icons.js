@@ -27,6 +27,7 @@ const ICONS = {
     list: '<path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h18"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    play: '<polygon points="6 3 20 12 6 21 6 3"/>',
 };
 export function icon(name, size = 13, className = "", strokeWidth = 2) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

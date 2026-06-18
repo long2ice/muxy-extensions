@@ -192,6 +192,18 @@ export async function prepareWorktreeBranch(cwd, number) {
     return preparePrBranch(cwd, number);
 }
 
+export async function runList() {
+    throw new Error("Action runs are only available on GitHub repositories.");
+}
+
+export async function runRerun() {
+    throw new Error("Action runs are only available on GitHub repositories.");
+}
+
+export async function runCancel() {
+    throw new Error("Action runs are only available on GitHub repositories.");
+}
+
 export async function prDiff(cwd, number) {
     const startPoint = `refs/muxy/pr/${number}`;
     await run(["git", "fetch", "origin", `+refs/pull/${number}/head:${startPoint}`], cwd);

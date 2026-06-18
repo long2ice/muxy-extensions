@@ -400,3 +400,6 @@ export const prReady = (cwd, opts) => forge.prReady(cwd, opts);
 export const prCheckout = (cwd, number) => forge.prCheckout(cwd, number);
 export const prepareWorktreeBranch = (cwd, number) => forge.prepareWorktreeBranch(cwd, number);
 export const prDiff = (cwd, number) => forge.prDiff(cwd, number);
+export const runList = (cwd, opts) => forge.runList(cwd, opts);
+export const runRerun = (cwd, id, opts) => forge.runRerun(cwd, id, opts);
+export const runCancel = (cwd, id) => forge.runCancel(cwd, id);

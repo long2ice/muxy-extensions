@@ -222,3 +222,40 @@ export async function prDiff(cwd, number) {
     const out = await run(["gh", "pr", "diff", String(number)], cwd);
     return { diff: out };
 }
+
+const RUN_FIELDS = "databaseId,displayTitle,workflowName,status,conclusion,headBranch,event,url,createdAt";
+
+function toRun(raw) {
+    return {
+        id: raw.databaseId,
+        title: raw.displayTitle || raw.workflowName || "",
+        workflow: raw.workflowName || "",
+        status: String(raw.status || "").toLowerCase(),
+        conclusion: String(raw.conclusion || "").toLowerCase(),
+        branch: raw.headBranch || "",
+        event: raw.event || "",
+        url: raw.url || "",
+        createdAt: raw.createdAt || "",
+    };
+}
+
+export async function runList(cwd, { limit } = {}) {
+    const argv = ["gh", "run", "list", "--json", RUN_FIELDS];
+    if (limit)
+        argv.push("--limit", String(limit));
+    const out = await run(argv, cwd);
+    if (!out.trim())
+        return [];
+    return JSON.parse(out).map(toRun);
+}
+
+export function runRerun(cwd, id, { failedOnly } = {}) {
+    const argv = ["gh", "run", "rerun", String(id)];
+    if (failedOnly)
+        argv.push("--failed");
+    return run(argv, cwd);
+}
+
+export function runCancel(cwd, id) {
+    return run(["gh", "run", "cancel", String(id)], cwd);
+}

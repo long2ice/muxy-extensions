@@ -184,7 +184,7 @@ export function menuItem(label, iconName, onClick, opts = {}) {
     return h("button", {
         type: "button",
         disabled: opts.disabled,
-        class: cls("flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-foreground outline-none hover:bg-accent disabled:pointer-events-none disabled:opacity-40", opts.danger && "hover:text-diff-remove"),
+        class: cls("flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] outline-none hover:bg-accent disabled:pointer-events-none disabled:opacity-40", opts.active ? "font-semibold text-primary" : "text-foreground", opts.danger && "hover:text-diff-remove"),
         onclick: () => onClick(),
     }, opts.loading
         ? icon("loader", 13, "animate-spin text-muted-foreground", 2)
