@@ -33,10 +33,10 @@
     ],
     "commands": [
       {
-        "id": "launch",
+        "id": "open",
         "title": "Commands: Open Launcher",
         "subtitle": "Run a pinned command in a new terminal",
-        "defaultShortcut": "ctrl+opt+c",
+        "defaultShortcut": "cmd+opt+c",
         "action": {
           "kind": "openPopover",
           "popover": "launcher"
@@ -59,7 +59,7 @@
           "symbol": "bolt.fill"
         },
         "tooltip": "Commands",
-        "command": "launch"
+        "command": "open"
       }
     ],
     "marketplace": {
