@@ -6,7 +6,8 @@ in a fresh interactive terminal.
 
 ## Usage
 
-- Click the bolt icon in the topbar (or press `⌘⇧L`) to open the launcher.
+- Click the bolt icon in the topbar (or press `⌃⌥C`) to open the launcher.
+  You can rebind this in **Settings → Keyboard Shortcuts**.
 - Pick a command to run it in a new terminal tab.
 - Keyboard: `↑`/`↓` to move, `Enter` to run, `Esc` to close, and number keys
   `1`–`9` to run that command directly. With many commands a search box appears
