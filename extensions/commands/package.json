@@ -36,7 +36,6 @@
         "id": "open",
         "title": "Commands: Open Launcher",
         "subtitle": "Run a pinned command in a new terminal",
-        "defaultShortcut": "cmd+opt+c",
         "action": {
           "kind": "openPopover",
           "popover": "launcher"
