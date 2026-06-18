@@ -29,6 +29,15 @@ button { font-family: inherit; cursor: pointer; }
 
 .launcher { display: flex; flex-direction: column; padding: var(--s4); }
 
+.cmd-filter {
+  width: 100%; height: 28px; margin-bottom: var(--s2); padding: 0 9px;
+  border: 1px solid var(--muxy-border); border-radius: 4px;
+  background: var(--muxy-background); color: var(--muxy-foreground);
+  font-size: var(--font-body); font-family: inherit;
+}
+.cmd-filter:focus { outline: none; border-color: var(--muxy-accent); }
+.cmd-filter::placeholder { color: var(--muxy-foreground-muted); }
+
 .cmd-list { list-style: none; margin: 0; padding: 0; }
 
 .cmd {
@@ -38,9 +47,14 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--muxy-foreground); text-align: left;
   font-size: var(--font-body); line-height: 1;
 }
-.cmd:hover { background: var(--muxy-hover); }
+.cmd:hover, .cmd.active { background: var(--muxy-hover); }
 .cmd-icon { width: var(--icon); height: var(--icon); flex: 0 0 auto; color: var(--muxy-foreground); }
-.cmd-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-num {
+  flex: 0 0 auto; min-width: 12px; text-align: center;
+  font-size: var(--font-caption); color: var(--muxy-foreground-muted);
+  font-family: 'SF Mono', Menlo, monospace;
+}
 
 .manage-sep { height: 1px; background: var(--muxy-border); margin: var(--s2) 0; }
 .manage {

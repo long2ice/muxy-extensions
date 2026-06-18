@@ -8,6 +8,9 @@ in a fresh interactive terminal.
 
 - Click the bolt icon in the topbar (or press `⌘⇧L`) to open the launcher.
 - Pick a command to run it in a new terminal tab.
+- Keyboard: `↑`/`↓` to move, `Enter` to run, `Esc` to close, and number keys
+  `1`–`9` to run that command directly. With many commands a search box appears
+  for filtering.
 - Click **Manage commands** to add, edit, reorder, or remove commands.
 
 Each command has a **name**, the **command** to run, an optional **working dir**
