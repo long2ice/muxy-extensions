@@ -244,15 +244,18 @@ export function parseOpenCodeGoRows(rows, nowMs) {
   const sessionCost = sumRange(rows, nowMs - FIVE_HOURS_MS, nowMs);
   const weeklyStartMs = startOfUtcWeek(nowMs);
   const weeklyCost = sumRange(rows, weeklyStartMs, weeklyStartMs + WEEK_MS);
-  const monthlyStartMs = startOfUtcMonth(nowMs);
-  const monthlyEndMs = startOfNextUtcMonth(nowMs);
-  const monthlyCost = sumRange(rows, monthlyStartMs, monthlyEndMs);
+  // Monthly window: use the earliest local opencode-go usage timestamp as a
+  // subscription-style anchor (matching OpenUsage). Falls back to UTC calendar
+  // month when no local history exists yet.
+  const anchorMs = rows.length > 0 ? Math.min(...rows.map((r) => r.createdMs)) : null;
+  const monthlyBounds = startOfAnchorMonth(nowMs, anchorMs);
+  const monthlyCost = sumRange(rows, monthlyBounds.start, monthlyBounds.end);
   const sessionReset = new Date(nextRollingReset(rows, nowMs, FIVE_HOURS_MS));
 
   return [
     row("Session", percent(sessionCost, LIMITS.session), sessionReset, `${formatNumber(sessionCost)} / ${LIMITS.session} credits`, FIVE_HOURS_MS / 1000),
     row("Weekly", percent(weeklyCost, LIMITS.weekly), new Date(weeklyStartMs + WEEK_MS), `${formatNumber(weeklyCost)} / ${LIMITS.weekly} credits`, WEEK_MS / 1000),
-    row("Monthly", percent(monthlyCost, LIMITS.monthly), new Date(monthlyEndMs), `${formatNumber(monthlyCost)} / ${LIMITS.monthly} credits`, (monthlyEndMs - monthlyStartMs) / 1000),
+    row("Monthly", percent(monthlyCost, LIMITS.monthly), new Date(monthlyBounds.end), `${formatNumber(monthlyCost)} / ${LIMITS.monthly} credits`, (monthlyBounds.end - monthlyBounds.start) / 1000),
   ];
 }
 
@@ -279,6 +282,31 @@ function startOfUtcMonth(nowMs) {
 function startOfNextUtcMonth(nowMs) {
   const date = new Date(nowMs);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+}
+
+function startOfAnchorMonth(nowMs, anchorMs) {
+  if (!anchorMs) return { start: startOfUtcMonth(nowMs), end: startOfNextUtcMonth(nowMs) };
+  const anchorDay = new Date(anchorMs).getUTCDate();
+  const now = new Date(nowMs);
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth();
+  let day = Math.min(anchorDay, daysInUtcMonth(year, month));
+  let start = Date.UTC(year, month, day, 0, 0, 0, 0);
+  if (start > nowMs) {
+    month -= 1;
+    if (month < 0) { month = 11; year -= 1; }
+    day = Math.min(anchorDay, daysInUtcMonth(year, month));
+    start = Date.UTC(year, month, day, 0, 0, 0, 0);
+  }
+  let endMonth = month + 1;
+  let endYear = year;
+  if (endMonth > 11) { endMonth = 0; endYear += 1; }
+  let end = Date.UTC(endYear, endMonth, Math.min(anchorDay, daysInUtcMonth(endYear, endMonth)), 0, 0, 0, 0);
+  return { start, end };
+}
+
+function daysInUtcMonth(year, month) {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 function nextRollingReset(rows, nowMs, windowMs) {

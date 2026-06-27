@@ -197,8 +197,7 @@ async function fetchKimiUsage(context) {
   let refreshMessage = null;
 
   // If the access token is stale, try to refresh it using the refresh_token.
-  // We only update the access_token in the file; the refresh_token is left
-  // untouched so the CLI continues to work.
+  // The refresh_token is also updated if the server rotates it.
   if (token && credentials?.refreshToken && credentials?.expiresAt && Date.now() > credentials.expiresAt * 1000) {
     try {
       const refreshed = await refreshKimiAccessToken(context, credentials);
@@ -257,11 +256,12 @@ async function refreshKimiAccessToken(context, credentials) {
   const newExpiresIn = response.expires_in || 900;
   const newExpiresAt = Math.floor(Date.now() / 1000) + newExpiresIn;
 
-  // Update only the access_token (and derived fields) in the credentials file.
-  // The refresh_token is intentionally left untouched.
+  // Update the access_token (and derived fields) in the credentials file.
+  // If the server returns a new refresh_token (rotation), use it.
+  const newRefreshToken = response.refresh_token || credentials.refreshToken;
   const updatedPayload = JSON.stringify({
     access_token: newAccessToken,
-    refresh_token: credentials.refreshToken,
+    refresh_token: newRefreshToken,
     expires_at: newExpiresAt,
     expires_in: newExpiresIn,
     scope: response.scope || "kimi-code",
@@ -275,7 +275,7 @@ async function refreshKimiAccessToken(context, credentials) {
 
   return {
     accessToken: newAccessToken,
-    refreshToken: credentials.refreshToken,
+    refreshToken: newRefreshToken,
     expiresAt: newExpiresAt,
     credentialPath: credentials.credentialPath,
   };
@@ -491,7 +491,10 @@ async function readClaudeCredentials(context) {
     }
   }
 
-  const plan = subscriptionType && rateLimitTier ? `${subscriptionType} ${rateLimitTier}` : subscriptionType || rateLimitTier || "";
+  // rateLimitTier may be a raw identifier like "default_calude_max_5x".
+  // Extract the last underscore-separated segment as a short suffix (e.g. "5x").
+  const tierSuffix = rateLimitTier ? rateLimitTier.split("_").pop() : "";
+  const plan = subscriptionType && tierSuffix ? `${subscriptionType} ${tierSuffix}` : subscriptionType || rateLimitTier || "";
   return { accessToken, planName: plan, refreshToken, expiresAt, credentialPath };
 }
 

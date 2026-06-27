@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { fetchLiveSnapshots } from "../src/live.mjs";
+import { parseOpenCodeGoRows } from "../src/live-parsers.mjs";
 
 test("regression: live provider fetch reads Codex auth from disk and parses WHAM usage rows", async () => {
   const calls = [];
@@ -88,6 +89,31 @@ test("regression: live provider fetch reads Claude credentials and parses usage 
   assert.deepEqual(claude.rows.map((row) => row.label), ["5h", "7d"]);
   assert.equal(claude.rows[0].detail, "67.8% used");
   assert.equal(claude.planName, "Max");
+});
+
+test("regression: Claude planName extracts tier suffix from rateLimitTier when API omits plan.display_name", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nUSER=me\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.claude/.credentials.json") {
+      return ok(JSON.stringify({ claudeAiOauth: { accessToken: "claude-token", subscriptionType: "Max", rateLimitTier: "default_calude_max_5x" } }));
+    }
+    if (argv[0] === "/bin/cat") return fail();
+    if (argv[0] === "/usr/bin/security") return fail();
+    if (argv[2]?.includes("/tmp/muxy/ai-usage-raw-")) return ok("");
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.anthropic.com/api/oauth/usage")) {
+      return ok(`${JSON.stringify({
+        five_hour: { utilization: 10, resets_at: "2026-06-04T13:00:00.000Z" },
+        seven_day: { used_percent: 5, reset_at: "2026-06-10T13:00:00.000Z" },
+      })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec });
+  const claude = snapshots.find((snapshot) => snapshot.id === "claude");
+
+  assert.equal(claude.state.kind, "available");
+  assert.equal(claude.planName, "Max 5x");
 });
 
 test("regression: live provider fetch reads Factory plain credentials and parses token buckets", async () => {
@@ -452,6 +478,34 @@ test("regression: live provider fetch shows unauthenticated when OpenCode Go aut
 
   assert.equal(opencode.state.kind, "unavailable");
   assert.equal(opencode.state.message, "Sign in to OpenCode Go");
+});
+
+test("regression: parseOpenCodeGoRows monthly window uses earliest usage as anchor, not UTC calendar month", () => {
+  // Anchor (earliest usage): April 15 (day 15). Now: June 10.
+  // Expected monthly window: May 15 ~ June 15 (subscription-style).
+  const nowMs = Date.UTC(2026, 5, 10, 12, 0, 0); // June 10, 2026
+  const rows = [
+    { createdMs: Date.UTC(2026, 3, 15, 10, 0, 0), cost: 5 },   // Apr 15 — anchor, before window
+    { createdMs: Date.UTC(2026, 4, 15, 0, 0, 0), cost: 10 },   // May 15 — start of current window
+    { createdMs: Date.UTC(2026, 5, 5, 0, 0, 0), cost: 10 },    // Jun 5  — within window
+  ];
+
+  const result = parseOpenCodeGoRows(rows, nowMs);
+  const monthly = result.find((r) => r.label === "Monthly");
+
+  // Window is May 15 ~ June 15. Only May 15 ($10) + Jun 5 ($10) = $20.
+  // Anchor Apr 15 ($5) is outside the window.
+  assert.equal(monthly.detail, "20.0 / 60 credits");
+  assert.equal(monthly.resetAt.toISOString(), "2026-06-15T00:00:00.000Z");
+});
+
+test("regression: parseOpenCodeGoRows falls back to UTC calendar month when no rows exist", () => {
+  const nowMs = Date.UTC(2026, 5, 10, 12, 0, 0); // June 10, 2026
+  const result = parseOpenCodeGoRows([], nowMs);
+  const monthly = result.find((r) => r.label === "Monthly");
+
+  // No rows → anchor is null → UTC calendar month: June 1 ~ July 1
+  assert.equal(monthly.resetAt.toISOString(), "2026-07-01T00:00:00.000Z");
 });
 
 function ok(stdout) {
