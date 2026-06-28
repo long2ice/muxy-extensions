@@ -7,6 +7,7 @@ import { ImageViewer } from "@/editor/image-viewer";
 import { SettingsSheet } from "@/editor/settings-sheet";
 import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon } from "@/editor/icons";
 import {
+  AUTO_SAVE_DELAY_MS,
   load_editor_config,
   subscribe_editor_config,
   update_editor_config,
@@ -17,6 +18,30 @@ import {
   write_editor_state,
 } from "@/lib/editor-state";
 import { clear, cls, h } from "@/lib/dom";
+
+const RELOAD_DEBOUNCE_MS = 250;
+
+function path_segments(path) {
+  return String(path ?? "")
+    .replace(/\/+$/, "")
+    .split("/")
+    .filter(Boolean);
+}
+
+// file.changed payloads carry an absolute path, while this.filePath is relative
+// to the worktree root — so a strict === never matches. Treat them as the same
+// file when the relative path is the tail of the changed path (or they're equal).
+function same_file(changedPath, filePath) {
+  const want = path_segments(filePath);
+  if (want.length === 0) return false;
+  const got = path_segments(changedPath);
+  if (got.length < want.length) return false;
+  const offset = got.length - want.length;
+  for (let i = 0; i < want.length; i += 1) {
+    if (got[offset + i] !== want[i]) return false;
+  }
+  return true;
+}
 
 function read_data() {
   return window.muxy?.data ?? {};
@@ -52,6 +77,9 @@ export class EditorApp {
     this.settingsSheet = null;
     this.tabFocused = document.hasFocus();
     this.pendingFocusRaf = 0;
+    this.reloadTimer = 0;
+    this.conflictPending = false;
+    this.autoSaveTimer = 0;
   }
 
   start() {
@@ -86,7 +114,9 @@ export class EditorApp {
         this.config = config;
         this.child?.updateConfig?.(this.config, this.isDark);
         this.settingsSheet?.setConfig(this.config);
+        this.syncAutoSave();
       }),
+      muxy.events.subscribe("file.changed", (payload) => this.onFileChanged(payload)),
       muxy.events.subscribe("command.files-save", () => {
         if (!document.hasFocus()) return;
         void this.save();
@@ -168,6 +198,8 @@ export class EditorApp {
 
   dispose() {
     if (this.pendingFocusRaf) cancelAnimationFrame(this.pendingFocusRaf);
+    if (this.reloadTimer) window.clearTimeout(this.reloadTimer);
+    this.cancelAutoSave();
     this.destroyChild();
     this.destroySettings();
     for (const dispose of this.disposers) dispose?.();
@@ -197,6 +229,14 @@ export class EditorApp {
   async loadTarget() {
     const filePath = this.filePath;
     this.updateTabChrome();
+
+    // Switching/reloading the target supersedes any pending external-change work.
+    if (this.reloadTimer) {
+      window.clearTimeout(this.reloadTimer);
+      this.reloadTimer = 0;
+    }
+    this.cancelAutoSave();
+    this.conflictPending = false;
 
     if (!filePath) {
       this.fileLoadId += 1;
@@ -244,6 +284,91 @@ export class EditorApp {
     }
   }
 
+  onFileChanged(payload) {
+    const filePath = this.filePath;
+    if (!filePath) return;
+    const changed = payload && typeof payload === "object" && "path" in payload ? payload.path : undefined;
+    if (typeof changed !== "string" || !same_file(changed, filePath)) return;
+    // Skip while loading or mid-save: those go through loadTarget()/save(),
+    // which already sync this.content with the freshest value.
+    if (this.loading || this.saving) return;
+    // A conflict prompt is open — don't queue another reload behind it.
+    if (this.conflictPending) return;
+    if (this.reloadTimer) return;
+    this.reloadTimer = window.setTimeout(() => {
+      this.reloadTimer = 0;
+      void this.reloadFromDisk(filePath);
+    }, RELOAD_DEBOUNCE_MS);
+  }
+
+  async reloadFromDisk(filePath) {
+    if (this.filePath !== filePath) return;
+    if (this.loading || this.saving) return;
+    // A conflict prompt for this file is already open — let the user resolve it first.
+    if (this.conflictPending) return;
+
+    if (this.isImage()) {
+      // Re-mount the viewer so the <img> re-fetches the changed bytes.
+      this.bodyKey = null;
+      this.render();
+      return;
+    }
+
+    let next;
+    try {
+      const file = await muxy.files.read(filePath);
+      next = file.content;
+    } catch {
+      return;
+    }
+    if (this.filePath !== filePath || this.saving || this.conflictPending) return;
+
+    if (!this.dirty) {
+      // Clean buffer: silently adopt the new bytes. Ignore no-op events (e.g. our own save).
+      if (next === this.content) return;
+      this.applyDiskContent(next);
+      return;
+    }
+
+    // Unsaved edits exist. Compare against the live buffer, not this.content
+    // (which still holds the value the file was opened with).
+    const buffer = this.child?.getValue ? this.child.getValue() : this.content;
+    if (next === buffer) return; // Disk matches what the user has — no real conflict.
+
+    void this.promptConflict(filePath, next);
+  }
+
+  applyDiskContent(next) {
+    this.content = next;
+    this.error = null;
+    this.bodyKey = null;
+    this.setDirty(false);
+    this.render();
+  }
+
+  async promptConflict(filePath, diskContent) {
+    this.conflictPending = true;
+    const name = basename(filePath);
+    let choice;
+    try {
+      choice = await muxy.dialog.confirm({
+        title: "File changed on disk",
+        message: `${name} was modified outside the editor and you have unsaved changes. Reload from disk and discard your edits, or keep editing?`,
+        buttons: ["Reload", "Keep My Changes"],
+        default: "Keep My Changes",
+        cancel: "Keep My Changes",
+        style: "warning",
+      });
+    } catch {
+      choice = null;
+    } finally {
+      this.conflictPending = false;
+    }
+    // The user may have switched files or saved while the dialog was open.
+    if (this.filePath !== filePath || this.saving) return;
+    if (choice === "Reload") this.applyDiskContent(diskContent);
+  }
+
   updateTabChrome() {
     if (!this.filePath) {
       void muxy.tabs.setTitle("");
@@ -271,14 +396,38 @@ export class EditorApp {
   markDirty() {
     if (this.dirty) {
       this.publishEditorState(true);
-      return;
+    } else {
+      this.setDirty(true);
     }
-    this.setDirty(true);
+    this.scheduleAutoSave();
+  }
+
+  scheduleAutoSave() {
+    if (this.autoSaveTimer) {
+      window.clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = 0;
+    }
+    if (this.config.autoSave === false) return;
+    if (!this.filePath || this.isImage()) return;
+    this.autoSaveTimer = window.setTimeout(() => {
+      this.autoSaveTimer = 0;
+      // Re-check at fire time: the buffer may be clean again, or a save/conflict in flight.
+      if (!this.dirty || this.saving || this.conflictPending) return;
+      void this.save();
+    }, AUTO_SAVE_DELAY_MS);
+  }
+
+  cancelAutoSave() {
+    if (this.autoSaveTimer) {
+      window.clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = 0;
+    }
   }
 
   async save() {
     if (!this.filePath || !this.child || this.saving) return false;
     if (typeof this.child.getValue !== "function") return false;
+    this.cancelAutoSave();
     const next = this.child.getValue();
     this.saving = true;
     this.updateTopbar();
@@ -294,6 +443,11 @@ export class EditorApp {
 
   async confirmClose() {
     if (!this.dirty) return false;
+    // With auto save on, just flush silently instead of prompting on close.
+    if (this.config.autoSave !== false && this.filePath && !this.isImage()) {
+      const ok = await this.save();
+      return !ok; // Block the close only if the save failed.
+    }
     const name = this.filePath ? basename(this.filePath) : "This file";
     const choice = await muxy.dialog.confirm({
       title: "Unsaved changes",
@@ -331,6 +485,16 @@ export class EditorApp {
     this.config = update_editor_config(this.config, patch);
     this.child?.updateConfig?.(this.config, this.isDark);
     this.settingsSheet?.setConfig(this.config);
+    this.syncAutoSave();
+  }
+
+  syncAutoSave() {
+    if (this.config.autoSave === false) {
+      this.cancelAutoSave();
+      return;
+    }
+    // Turned on (or already on) with pending edits — make sure a save is scheduled.
+    if (this.dirty && !this.autoSaveTimer) this.scheduleAutoSave();
   }
 
   render() {

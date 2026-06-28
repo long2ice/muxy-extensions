@@ -8,10 +8,13 @@ export const DEFAULT_CONFIG = {
   linting: true,
   colorPreview: true,
   treeSitter: true,
+  autoSave: true,
 };
 
 export const FONT_SIZE_MIN = 10;
 export const FONT_SIZE_MAX = 24;
+
+export const AUTO_SAVE_DELAY_MS = 1000;
 
 const STORAGE_KEY = "muxy.files.editor.config";
 const SYNC_EVENT = "muxy-files-editor-config";
